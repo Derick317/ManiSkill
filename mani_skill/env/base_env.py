@@ -20,7 +20,7 @@ from .camera import CombinedCamera, read_images_from_camera, read_pointclouds_fr
 from collections import defaultdict
 from mani_skill.utils.geometry import angle_distance
 from mani_skill.utils.misc import get_actor_state, get_pad_articulation_state
-
+import time
 from pathlib import Path
 
 
@@ -70,16 +70,25 @@ class BaseEnv(Env):
                 max_episode_steps=200, 
                 variant_config={}, 
                 override_model_file=None,
+                iter_all_cabinet=False
         ):
         self.set_env_mode(obs_mode, reward_type)
         self._engine = _engine
         self._renderer = _renderer
 
-        self._setup_main_rng(seed=np.random.seed())
+        if iter_all_cabinet:
+            self._setup_main_rng(seed=np.random.seed(int(time.time())))
+        else:
+            self._setup_main_rng(seed=np.random.seed())
         self.variant_config = variant_config
         self.frame_skip = frame_skip
+        self.iter_all_cabinet = iter_all_cabinet
 
         self.yaml_config = preprocess(config_file)
+        if self.iter_all_cabinet and len(self.variant_config) == 0:
+            first_id = list(self.yaml_config['layout']['articulations'][0]['_variants']['options'].keys())[0]
+            self.recent_id_idx = 0 # self.get_all_model_ids().index(str(self.selected_id))
+            self.variant_config['partnet_mobility_id'] = first_id
         if override_model_file is not None:
             art_name, file_name = override_model_file
             self.override_models(art_name, file_name)
@@ -155,6 +164,10 @@ class BaseEnv(Env):
         self.level_config, self.level_variant_config = process_variants(
             config, self._level_rng, self.variant_config
         )
+        # update variant_config, if neccessary
+        if self.iter_all_cabinet:
+            self.recent_id_idx = (1 + self.recent_id_idx) % len(self.get_all_model_ids())
+            self.variant_config['partnet_mobility_id'] = self.get_all_model_ids()[self.recent_id_idx]
 
         # load everything
         self._setup_renderer()
@@ -174,6 +187,40 @@ class BaseEnv(Env):
 
         # Cannot return obs right now because something will be determined in derived class
         # return self.get_obs() 
+
+    def save_state(self, path_and_filename: str):
+        assert path_and_filename[-4:] == ".npz", "Invalid File Name!"
+        state = self.get_state() # state may be a numpy ndarray
+        arms_dof = self.agent.robot.dof - 3
+        assert arms_dof == 10, "The degree of freedom of the agent's arms is not correct!"
+        actors, arts = self.get_all_objects_in_state()
+        num_actors = [len(actors)]
+        art_dofs = []
+        max_dofs = []
+        for art, max_dof in arts:
+            art_dofs.append(art.dof)
+            max_dofs.append(max_dof)
+        # change state into what can be saved in a file and save the file
+        np.savez(path_and_filename, state=state, num_actors=np.array(num_actors), art_dofs=np.array(art_dofs),
+            max_dofs=np.array(max_dofs), selected_id=np.array([self.selected_id]))
+
+    def load_state(self, path_and_filename: str):
+        assert path_and_filename[-4:] == ".npz", "Invalid File Name!"
+        # open the file where the state is saved.
+        state_data = np.load(path_and_filename)
+        state = state_data['state']
+        num_actors = state_data['num_actors']
+        art_dofs = state_data['art_dofs']
+        max_dofs = state_data['max_dofs']
+        selected_id = state_data['selected_id']
+        state_data.close()
+        return state, num_actors, art_dofs, max_dofs, selected_id
+
+    def reset_with_state(self, state: np.ndarray, num_actors: np.ndarray, art_dofs: np.ndarray, max_dofs: np.ndarray, selected_id: np.ndarray):
+        raise NotImplementedError()      
+
+    def reset_from_path(self, create_path):
+        raise NotImplementedError()
 
     def _init_eval_record(self):
         self.keep_good_steps = defaultdict(int)
@@ -463,7 +510,7 @@ class BaseEnv(Env):
         self._viewer.set_camera_rpy(0, -0.8, 0)
 
     def get_all_model_ids(self):
-        if 'partnet_mobility_id' in self.variant_config:
+        if 'partnet_mobility_id' in self.variant_config and not self.iter_all_cabinet:
             return [self.variant_config['partnet_mobility_id']]
         else:
             return self.all_model_ids
@@ -474,10 +521,12 @@ class BaseEnv(Env):
         actors_state = [get_actor_state(actor) for actor in actors]
         arts_state = [get_pad_articulation_state(art, max_dof) for art, max_dof in arts]
 
-        return np.concatenate( actors_state + arts_state + [
+        state = np.concatenate( actors_state + arts_state + [
             self.get_additional_task_info(obs_mode='state'),
             self.agent.get_state(with_controller_state=with_controller_state),
         ])
+
+        return state
 
     def get_all_objects_in_state(self):
         # return [actor_1, ...], [(art_1, max_dof), ..]
@@ -664,7 +713,7 @@ class BaseEnv(Env):
             if len(views) == 1:
                 view = next(iter(views.values()))
                 obs[self.obs_mode] = view
-        return obs
+        return obs 
 
 
     def close(self):

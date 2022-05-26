@@ -52,9 +52,53 @@ class OpenCabinetEnvBase(BaseEnv):
 
         self.target_qpos = lmin + (lmax - lmin) * self.custom['open_extent']
         self.pose_at_joint_zero = self.target_link.get_pose()
+        obs = self.get_obs()
+
+        return obs
+
+    def save_state(self, path_and_filename: str):
+        super().save_state(path_and_filename) 
+        
+    def load_state(self, path_and_filename: str):
+        return super().load_state(path_and_filename)
+        
+    def reset_with_state(self, state: np.ndarray, num_actors: np.ndarray, art_dofs: np.ndarray, max_dofs: np.ndarray, selected_id: np.ndarray, *args, **kwargs):
+        self.reset(*args, **kwargs)
+        actors, arts = self.get_all_objects_in_state() # actors = [], arts = [(self.cabinet, self.cabinet_max_dof)]
+        assert num_actors.shape == (1,) and num_actors[0] == len(actors)
+        assert selected_id.shape == (1,) and selected_id[0] == self.selected_id, "Your id is different from the id of the environnment!"
+        art_dofs_now = []
+        max_dofs_now = []
+        for art, max_dof in arts:
+            art_dofs_now.append(art.dof)
+            max_dofs_now.append(max_dof)
+        assert (np.array(art_dofs_now) == art_dofs).all()
+        assert (np.array(max_dofs_now) == max_dofs).all()
+        self.set_state(state)
+        obs = self.get_obs()
+        
+        return obs
+
+    def reset_from_path(self, concatenate_path, *args, **kwargs):
+        assert len(concatenate_path) == 3
+        self.reset(*args, **kwargs)
+        path_and_filename = concatenate_path[0] + f"{self.selected_id}" 
+        path_and_filename += concatenate_path[1] + f"{self.target_index}" + concatenate_path[2]
+        state, num_actors, art_dofs, max_dofs, selected_id = self.load_state(path_and_filename)
+        actors, arts = self.get_all_objects_in_state() # actors = [], arts = [(self.cabinet, self.cabinet_max_dof)]
+        assert num_actors.shape == (1,) and num_actors[0] == len(actors)
+        assert selected_id.shape == (1,) and selected_id[0] == self.selected_id, "Your id is different from the id of the environnment!"
+        art_dofs_now = []
+        max_dofs_now = []
+        for art, max_dof in arts:
+            art_dofs_now.append(art.dof)
+            max_dofs_now.append(max_dof)
+        assert (np.array(art_dofs_now) == art_dofs).all()
+        assert (np.array(max_dofs_now) == max_dofs).all()
+        self.set_state(state)
 
         return self.get_obs()
-
+        
     def _place_cabinet(self):
         mins, maxs = get_axis_aligned_bbox_for_articulation(self.cabinet)
         self.cabinet.set_pose(Pose([0,0, -mins[2]], [1,0,0,0]) )
