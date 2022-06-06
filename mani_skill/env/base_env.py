@@ -222,6 +222,9 @@ class BaseEnv(Env):
     def reset_from_path(self, create_path):
         raise NotImplementedError()
 
+    def change_step_in_ep(self, step_in_ep):
+        self.step_in_ep = step_in_ep
+
     def _init_eval_record(self):
         self.keep_good_steps = defaultdict(int)
         keep_good_time = 0.5
