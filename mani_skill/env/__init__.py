@@ -116,3 +116,33 @@ register(
     entry_point='mani_skill.env.push_chair:PushChairEnv',
     kwargs={'override_model_file': ('chair', 'chair_models_custom_split_example.yml')}
 )
+
+################################################################
+# Split Open-Door Environment without handle in the middle
+################################################################
+
+register(
+    id='OpenCabinetDoor_NoMidSplit-v0',
+    entry_point='mani_skill.env.open_cabinet_door_drawer:OpenCabinetDoorEnv',
+    kwargs={'override_model_file': ('cabinet', 'door_models_split_no_mid_handle.yml')}
+)
+
+################################################################
+# Split Open-Door Environment for Training
+################################################################
+
+register(
+    id='OpenCabinetDoor_Split_Train-v0',
+    entry_point='mani_skill.env.open_cabinet_door_drawer:OpenCabinetDoorEnv',
+    kwargs={'override_model_file': ('cabinet', 'door_models_train.yml')}
+)
+
+################################################################
+# Split Open-Door Environment for Validation
+################################################################
+
+register(
+    id='OpenCabinetDoor_Split_Val-v0',
+    entry_point='mani_skill.env.open_cabinet_door_drawer:OpenCabinetDoorEnv',
+    kwargs={'override_model_file': ('cabinet', 'door_models_val.yml')}
+)

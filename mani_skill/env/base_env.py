@@ -70,6 +70,7 @@ class BaseEnv(Env):
                 max_episode_steps=200, 
                 variant_config={}, 
                 override_model_file=None,
+                id_in_obs = False,
                 iter_all_cabinet=False
         ):
         self.set_env_mode(obs_mode, reward_type)
@@ -83,6 +84,7 @@ class BaseEnv(Env):
         self.variant_config = variant_config
         self.frame_skip = frame_skip
         self.iter_all_cabinet = iter_all_cabinet
+        self.id_in_obs = id_in_obs
 
         self.yaml_config = preprocess(config_file)
         if self.iter_all_cabinet and len(self.variant_config) == 0:
@@ -186,7 +188,7 @@ class BaseEnv(Env):
         self.step_in_ep = 0
 
         # Cannot return obs right now because something will be determined in derived class
-        # return self.get_obs() 
+        # return self.get_obs()
 
     def save_state(self, path_and_filename: str):
         assert path_and_filename[-4:] == ".npz", "Invalid File Name!"
@@ -716,6 +718,8 @@ class BaseEnv(Env):
             if len(views) == 1:
                 view = next(iter(views.values()))
                 obs[self.obs_mode] = view
+            if self.id_in_obs:
+                obs["id"] = np.array([int(self.selected_id), self.target_index])
         return obs 
 
 

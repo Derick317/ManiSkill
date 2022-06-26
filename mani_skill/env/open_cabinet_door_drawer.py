@@ -328,15 +328,15 @@ class OpenCabinetEnvBase(BaseEnv):
 
         if other_info['ee_close_to_handle']:
             stage_reward += 0.5
-            vel_reward = normalize_and_clip_in_interval(cabinet_vel, -0.1, 0.5) * vel_coefficient  # Push vel to positive
-            dist_reward = normalize_and_clip_in_interval(self.cabinet.get_qpos()[self.target_index_in_active_joints],
-                                                         0, self.target_qpos) * dist_coefficient
-            reward += dist_reward + vel_reward
-            if flag_dict['open_enough']:
-                stage_reward += (vel_coefficient + 2)
-                reward = reward - vel_reward + gripper_vel_rew
-                if flag_dict['cabinet_static']:
-                    stage_reward += 1
+        vel_reward = normalize_and_clip_in_interval(cabinet_vel, -0.1, 0.5) * vel_coefficient  # Push vel to positive
+        dist_reward = normalize_and_clip_in_interval(self.cabinet.get_qpos()[self.target_index_in_active_joints],
+                                                        0, self.target_qpos) * dist_coefficient
+        reward += dist_reward + vel_reward
+        if flag_dict['open_enough']:
+            stage_reward += (vel_coefficient + 2)
+            reward = reward - vel_reward + gripper_vel_rew
+            if flag_dict['cabinet_static']:
+                stage_reward += 1
         info_dict = {
             'dist_ee_to_handle': dist_ee_to_handle,
             'angle1': angle1,
@@ -415,3 +415,85 @@ class OpenCabinetDrawerEnv(OpenCabinetEnvBase):
     @property
     def num_target_links(self):
         return super().num_target_links('prismatic')
+
+"""
+Backup original function
+    def compute_dense_reward(self, action, state=None):
+        if state is not None:
+            self.set_state(state)
+
+        actor = self.target_link
+
+        flag_dict = self.compute_eval_flag_dict()
+        other_info = self.compute_other_flag_dict()
+        dist_ee_to_handle = other_info['dist_ee_to_handle']
+        dist_ee_mid_to_handle = other_info['dist_ee_mid_to_handle']
+
+        agent_pose = self.agent.hand.get_pose()
+        target_pose = self.target_link.get_pose() * self.grasp_pose[self.target_link_name][0]
+        target_pose_2 = self.target_link.get_pose() * self.grasp_pose[self.target_link_name][1]
+
+        angle1 = angle_distance(agent_pose, target_pose)
+        angle2 = angle_distance(agent_pose, target_pose_2)
+        gripper_angle_err = min(angle1, angle2) / np.pi
+
+        cabinet_vel = self.cabinet.get_qvel()[self.target_index_in_active_joints]
+
+        gripper_vel_norm = norm(actor.get_velocity())
+        gripper_ang_vel_norm = norm(actor.get_angular_velocity())
+        gripper_vel_rew = -(gripper_vel_norm + gripper_ang_vel_norm * 0.5)
+
+        scale = 1
+        reward = 0
+        stage_reward = 0
+
+        vel_coefficient = 1.5
+        dist_coefficient = 0.5
+
+        gripper_angle_rew = -gripper_angle_err * 3 
+
+        rew_ee_handle = -dist_ee_to_handle.mean() * 2
+        rew_ee_mid_handle = normalize_and_clip_in_interval(dist_ee_mid_to_handle, -0.01, 4E-3) - 1
+
+        reward = gripper_angle_rew + rew_ee_handle + rew_ee_mid_handle - (dist_coefficient + vel_coefficient)
+        stage_reward = -(5 + vel_coefficient + dist_coefficient)
+
+        vel_reward = 0
+        dist_reward = 0
+
+        if other_info['ee_close_to_handle']:
+            stage_reward += 0.5
+            vel_reward = normalize_and_clip_in_interval(cabinet_vel, -0.1, 0.5) * vel_coefficient  # Push vel to positive
+            dist_reward = normalize_and_clip_in_interval(self.cabinet.get_qpos()[self.target_index_in_active_joints],
+                                                         0, self.target_qpos) * dist_coefficient
+            reward += dist_reward + vel_reward
+            if flag_dict['open_enough']:
+                stage_reward += (vel_coefficient + 2)
+                reward = reward - vel_reward + gripper_vel_rew
+                if flag_dict['cabinet_static']:
+                    stage_reward += 1
+        info_dict = {
+            'dist_ee_to_handle': dist_ee_to_handle,
+            'angle1': angle1,
+            'angle2': angle2,
+            'dist_ee_mid_to_handle': dist_ee_mid_to_handle,
+            'rew_ee_handle': rew_ee_handle,
+            'rew_ee_mid_handle': rew_ee_mid_handle,
+
+            'qpos_rew': dist_reward,
+            'qvel_rew': vel_reward,
+
+            'gripper_angle_err': gripper_angle_err * 180,
+            'gripper_angle_rew': gripper_angle_rew,
+            'gripper_vel_norm': gripper_vel_norm,
+            'gripper_ang_vel_norm': gripper_ang_vel_norm,
+
+            'qpos': self.cabinet.get_qpos()[self.target_index_in_active_joints],
+            'qvel': cabinet_vel,
+            'target_qpos': self.target_qpos,
+            'reward_raw': reward,
+            'stage_reward': stage_reward,
+        }
+        reward = (reward + stage_reward) * scale
+        return reward, info_dict
+"""
